@@ -19,6 +19,8 @@ const PARAMETER_REQUEST_LIST: &[u8] = &[
     dhcpv4_field::OPT_SUBNET_MASK,
     dhcpv4_field::OPT_ROUTER,
     dhcpv4_field::OPT_DOMAIN_NAME_SERVER,
+    dhcpv4_field::OPT_TFTP_SERVER_NAME,
+    dhcpv4_field::OPT_BOOTFILE_NAME,
 ];
 
 /// IPv4 configuration data returned by `client.poll()`
@@ -27,6 +29,8 @@ pub struct Config {
     pub address: Option<Ipv4Cidr>,
     pub router: Option<Ipv4Address>,
     pub dns_servers: [Option<Ipv4Address>; 3],
+    pub tftp_server_name: Option<arraystring::ArrayString<arraystring::typenum::U100>>,
+    pub bootfile_name: Option<arraystring::ArrayString<arraystring::typenum::U100>>,
 }
 
 #[derive(Debug)]
@@ -34,6 +38,7 @@ struct RequestState {
     retry: u16,
     endpoint_ip: Ipv4Address,
     server_identifier: Ipv4Address,
+    offer_ip: Ipv4Address,
 }
 
 #[derive(Debug)]
@@ -59,6 +64,8 @@ pub struct Client {
     /// When to send next request
     next_egress: Instant,
     transaction_id: u32,
+    // GUID for PXE
+    guid: [u8; 16],
 }
 
 /// DHCP client with a RawSocket.
@@ -93,17 +100,18 @@ impl Client {
     ///     Instant::now()
     /// );
     /// ```
-    pub fn new<'a, 'b, 'c>(sockets: &mut SocketSet<'a, 'b, 'c>, rx_buffer: RawSocketBuffer<'b, 'c>, tx_buffer: RawSocketBuffer<'b, 'c>, now: Instant) -> Self
+    pub fn new<'a, 'b, 'c>(sockets: &mut SocketSet<'a, 'b, 'c>, rx_buffer: RawSocketBuffer<'b, 'c>, tx_buffer: RawSocketBuffer<'b, 'c>, guid: [u8; 16], now: Instant) -> Self
     where 'b: 'c,
     {
         let raw_socket = RawSocket::new(IpVersion::Ipv4, IpProtocol::Udp, rx_buffer, tx_buffer);
         let raw_handle = sockets.add(raw_socket);
 
-        Client {
+        Self {
             state: ClientState::Discovering,
             raw_handle,
             next_egress: now,
             transaction_id: 1,
+            guid,
         }
     }
 
@@ -207,7 +215,13 @@ impl Client {
                let router = dhcp_repr.router;
                let dns_servers = dhcp_repr.dns_servers
                    .unwrap_or([None; 3]);
-               Some(Config { address, router, dns_servers })
+            Some(Config {
+                address,
+                router,
+                dns_servers,
+                tftp_server_name: dhcp_repr.tftp_server_name,
+                bootfile_name: dhcp_repr.bootfile_name,
+            })
         } else {
             None
         };
@@ -221,6 +235,7 @@ impl Client {
                     retry: 0,
                     endpoint_ip: *src_ip,
                     server_identifier,
+                    offer_ip: dhcp_repr.your_ip,
                 };
                 Some(ClientState::Requesting(r_state))
             }
@@ -272,6 +287,8 @@ impl Client {
                 address: Some(Ipv4Cidr::new(Ipv4Address::UNSPECIFIED, 0)),
                 router: None,
                 dns_servers: [None; 3],
+                tftp_server_name: None,
+                bootfile_name: None,
             }));
         }
 
@@ -296,6 +313,9 @@ impl Client {
             parameter_request_list: None,
             max_size: Some(raw_socket.payload_recv_capacity() as u16),
             dns_servers: None,
+            guid: Some(self.guid),
+            tftp_server_name: None,
+            bootfile_name: None,
         };
         let mut send_packet = |iface, endpoint, dhcp_repr| {
             send_packet(iface, raw_socket, &endpoint, &dhcp_repr, checksum_caps)
@@ -325,7 +345,7 @@ impl Client {
                     Some(addr) if !addr.is_unspecified() =>
                         Some(addr),
                     _ =>
-                        None,
+                        Some(r_state.offer_ip),
                 };
                 dhcp_repr.message_type = DhcpMessageType::Request;
                 dhcp_repr.broadcast = false;

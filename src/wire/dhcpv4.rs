@@ -674,6 +674,12 @@ pub struct Repr<'a> {
     pub dns_servers: Option<[Option<Ipv4Address>; 3]>,
     /// The maximum size dhcp packet the interface can receive
     pub max_size: Option<u16>,
+    /// The GUID for option 97
+    pub guid: Option<[u8; 16]>,
+    /// TFTP server name, option 66
+    pub tftp_server_name: Option<arraystring::ArrayString<arraystring::typenum::U100>>,
+    /// Bootfile name, option 67
+    pub bootfile_name: Option<arraystring::ArrayString<arraystring::typenum::U100>>,
 }
 
 impl<'a> Repr<'a> {
@@ -687,6 +693,12 @@ impl<'a> Repr<'a> {
         if self.server_identifier.is_some() { len += 6; }
         if self.max_size.is_some() { len += 4; }
         if let Some(list) = self.parameter_request_list { len += list.len() + 2; }
+        if let Some(guid) = self.guid { len += guid.len() + 3; }
+
+        // PXE options 93 and 94
+        len += 4 + 5;
+        // PXE option 60 vendor class identifier
+        len += 11;
 
         len
     }
@@ -725,6 +737,8 @@ impl<'a> Repr<'a> {
         let mut parameter_request_list = None;
         let mut dns_servers = None;
         let mut max_size = None;
+        let mut tftp_server_name = None;
+        let mut bootfile_name = None;
 
         let mut options = packet.options()?;
         while options.len() > 0 {
@@ -768,6 +782,30 @@ impl<'a> Repr<'a> {
                     }
                     dns_servers = Some(dns_servers_inner);
                 }
+                DhcpOption::Other {
+                    kind: field::OPT_TFTP_SERVER_NAME,
+                    data,
+                } => {
+                    tftp_server_name =
+                        match arraystring::ArrayString::<arraystring::typenum::U100>::try_from_utf8(
+                            data,
+                        ) {
+                            Ok(data) => Some(data),
+                            _ => None,
+                        };
+                }
+                DhcpOption::Other {
+                    kind: field::OPT_BOOTFILE_NAME,
+                    data,
+                } => {
+                    bootfile_name =
+                        match arraystring::ArrayString::<arraystring::typenum::U100>::try_from_utf8(
+                            data,
+                        ) {
+                            Ok(data) => Some(data),
+                            _ => None,
+                        };
+                }
                 DhcpOption::Other {..} => {}
             }
             options = next_options;
@@ -780,6 +818,9 @@ impl<'a> Repr<'a> {
             broadcast, requested_ip, server_identifier, router,
             subnet_mask, client_identifier, parameter_request_list, dns_servers, max_size,
             message_type: message_type?,
+            guid: None,
+            tftp_server_name,
+            bootfile_name,
         })
     }
 
@@ -827,6 +868,48 @@ impl<'a> Repr<'a> {
                 let option = DhcpOption::Other{ kind: field::OPT_PARAMETER_REQUEST_LIST, data: list };
                 let tmp = options; options = option.emit(tmp);
             }
+            if let Some(guid) = self.guid {
+                let mut data = [0; 17];
+                data[0] = 0;
+                data[1..].copy_from_slice(&guid);
+                let option = DhcpOption::Other {
+                    kind: 97,
+                    data: &data,
+                };
+                let tmp = options;
+                options = option.emit(tmp);
+            }
+            // Option 93 Client System Architecture Type Option Definition
+            {
+                let tmp = options;
+                options = DhcpOption::Other {
+                    kind: 93,
+                    data: &[0x00, 0x15],
+                }
+                .emit(tmp);
+            }
+            // Option 94 Client Network Interface Identifier Option Definition
+            {
+                let tmp = options;
+                options = DhcpOption::Other {
+                    kind: 94,
+                    data: &[0x01, 2, 1],
+                }
+                .emit(tmp);
+            }
+            // Option 60 vendor class identifier
+            {
+                let tmp = options;
+                options = DhcpOption::Other {
+                    kind: 60,
+                    data: &[
+                        'P' as u8, 'X' as u8, 'E' as u8, 'C' as u8, 'l' as u8, 'i' as u8,
+                        'e' as u8, 'n' as u8, 't' as u8,
+                    ],
+                }
+                .emit(tmp);
+            }
+
             DhcpOption::EndOfList.emit(options);
         }
 
@@ -992,6 +1075,9 @@ mod test {
             server_identifier: None,
             parameter_request_list: Some(&[1, 3, 6, 42]),
             dns_servers: None,
+            guid: None,
+            tftp_server_name: None,
+            bootfile_name: None,
         }
     }
 
