@@ -121,6 +121,12 @@ pub struct Cidr {
 }
 
 impl Cidr {
+    /// Cidr with the unspecified address (for static initalization)
+    pub const UNSPECIFIED: Cidr = Cidr {
+        address: Address::UNSPECIFIED,
+        prefix_len: 0,
+    };
+
     /// Create an IPv4 CIDR block from the given address and prefix length.
     ///
     /// # Panics
