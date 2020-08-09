@@ -677,9 +677,9 @@ pub struct Repr<'a> {
     /// The GUID for option 97
     pub guid: Option<[u8; 16]>,
     /// TFTP server name, option 66
-    pub tftp_server_name: Option<arraystring::ArrayString<arraystring::typenum::U100>>,
+    pub tftp_server_name: Option<arraystring::ArrayString<arraystring::typenum::U255>>,
     /// Bootfile name, option 67
-    pub bootfile_name: Option<arraystring::ArrayString<arraystring::typenum::U100>>,
+    pub bootfile_name: Option<arraystring::ArrayString<arraystring::typenum::U255>>,
 }
 
 impl<'a> Repr<'a> {
@@ -787,7 +787,7 @@ impl<'a> Repr<'a> {
                     data,
                 } => {
                     tftp_server_name =
-                        match arraystring::ArrayString::<arraystring::typenum::U100>::try_from_utf8(
+                        match arraystring::ArrayString::<arraystring::typenum::U255>::try_from_utf8(
                             data,
                         ) {
                             Ok(data) => Some(data),
@@ -799,7 +799,7 @@ impl<'a> Repr<'a> {
                     data,
                 } => {
                     bootfile_name =
-                        match arraystring::ArrayString::<arraystring::typenum::U100>::try_from_utf8(
+                        match arraystring::ArrayString::<arraystring::typenum::U255>::try_from_utf8(
                             data,
                         ) {
                             Ok(data) => Some(data),
