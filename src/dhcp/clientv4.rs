@@ -10,7 +10,7 @@ use iface::EthernetInterface as Interface;
 use time::{Instant, Duration};
 use super::{UDP_SERVER_PORT, UDP_CLIENT_PORT};
 
-const DISCOVER_TIMEOUT: u64 = 10;
+const DISCOVER_TIMEOUT: u64 = 1;
 const REQUEST_TIMEOUT: u64 = 1;
 const REQUEST_RETRIES: u16 = 15;
 const RENEW_INTERVAL: u64 = 60;
@@ -66,6 +66,8 @@ pub struct Client {
     transaction_id: u32,
     // GUID for PXE
     guid: [u8; 16],
+    // Vendor class identifier for PXE
+    vendor_class_identifier: [u8; 32],
 }
 
 /// DHCP client with a RawSocket.
@@ -100,7 +102,12 @@ impl Client {
     ///     Instant::now()
     /// );
     /// ```
-    pub fn new<'a, 'b, 'c>(sockets: &mut SocketSet<'a, 'b, 'c>, rx_buffer: RawSocketBuffer<'b, 'c>, tx_buffer: RawSocketBuffer<'b, 'c>, guid: [u8; 16], now: Instant) -> Self
+    pub fn new<'a, 'b, 'c>(sockets: &mut SocketSet<'a, 'b, 'c>, 
+        rx_buffer: RawSocketBuffer<'b, 'c>, 
+        tx_buffer: RawSocketBuffer<'b, 'c>, 
+        guid: [u8; 16], 
+        vendor_class_identifier: [u8; 32], 
+        now: Instant) -> Self
     where 'b: 'c,
     {
         let raw_socket = RawSocket::new(IpVersion::Ipv4, IpProtocol::Udp, rx_buffer, tx_buffer);
@@ -112,6 +119,7 @@ impl Client {
             next_egress: now,
             transaction_id: 1,
             guid,
+            vendor_class_identifier,
         }
     }
 
@@ -314,6 +322,7 @@ impl Client {
             max_size: Some(raw_socket.payload_recv_capacity() as u16),
             dns_servers: None,
             guid: Some(self.guid),
+            vendor_class_identifier: Some(self.vendor_class_identifier),
             tftp_server_name: None,
             bootfile_name: None,
         };
@@ -388,7 +397,7 @@ impl Client {
 }
 
 fn send_packet<DeviceT: for<'d> Device<'d>>(iface: &mut Interface<DeviceT>, raw_socket: &mut RawSocket, endpoint: &IpEndpoint, dhcp_repr: &DhcpRepr, checksum_caps: &ChecksumCapabilities) -> Result<()> {
-    let mut dhcp_payload_buf = [0; 320];
+    let mut dhcp_payload_buf = [0; 380];
     assert!(dhcp_repr.buffer_len() <= dhcp_payload_buf.len());
     let dhcp_payload = &mut dhcp_payload_buf[0..dhcp_repr.buffer_len()];
     {

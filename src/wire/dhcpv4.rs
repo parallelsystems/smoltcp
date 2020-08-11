@@ -676,6 +676,8 @@ pub struct Repr<'a> {
     pub max_size: Option<u16>,
     /// The GUID for option 97
     pub guid: Option<[u8; 16]>,
+    /// Vendor class identifier for option 60
+    pub vendor_class_identifier: Option<[u8; 32]>,
     /// TFTP server name, option 66
     pub tftp_server_name: Option<arraystring::ArrayString<arraystring::typenum::U255>>,
     /// Bootfile name, option 67
@@ -698,7 +700,7 @@ impl<'a> Repr<'a> {
         // PXE options 93 and 94
         len += 4 + 5;
         // PXE option 60 vendor class identifier
-        len += 11;
+        if let Some(vendor_class_identifier) = self.vendor_class_identifier { len += vendor_class_identifier.len() + 2; }
 
         len
     }
@@ -819,6 +821,7 @@ impl<'a> Repr<'a> {
             subnet_mask, client_identifier, parameter_request_list, dns_servers, max_size,
             message_type: message_type?,
             guid: None,
+            vendor_class_identifier: None,
             tftp_server_name,
             bootfile_name,
         })
@@ -898,14 +901,11 @@ impl<'a> Repr<'a> {
                 .emit(tmp);
             }
             // Option 60 vendor class identifier
-            {
+            if let Some(vendor_class_identifier) = self.vendor_class_identifier {
                 let tmp = options;
                 options = DhcpOption::Other {
                     kind: 60,
-                    data: &[
-                        'P' as u8, 'X' as u8, 'E' as u8, 'C' as u8, 'l' as u8, 'i' as u8,
-                        'e' as u8, 'n' as u8, 't' as u8,
-                    ],
+                    data: &vendor_class_identifier,
                 }
                 .emit(tmp);
             }
@@ -1076,6 +1076,7 @@ mod test {
             parameter_request_list: Some(&[1, 3, 6, 42]),
             dns_servers: None,
             guid: None,
+            vendor_class_identifier: None,
             tftp_server_name: None,
             bootfile_name: None,
         }
