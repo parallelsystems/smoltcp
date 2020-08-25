@@ -156,9 +156,12 @@ impl Client {
                     Ok((IpEndpoint {
                         addr: IpAddress::Ipv4(src_ip),
                         port: UDP_SERVER_PORT,
-                    }, IpEndpoint {
+                        hw_timestamp: None,
+                    },
+                    IpEndpoint {
                         addr: _,
                         port: UDP_CLIENT_PORT,
+                        hw_timestamp: None,
                     }, payload)) =>
                         self.ingress(iface, now, payload, &src_ip),
                     Ok(_) =>
@@ -338,6 +341,7 @@ impl Client {
                 let endpoint = IpEndpoint {
                     addr: Ipv4Address::BROADCAST.into(),
                     port: UDP_SERVER_PORT,
+                    hw_timestamp: None,
                 };
                 net_trace!("DHCP send discover to {}: {:?}", endpoint, dhcp_repr);
                 send_packet(iface, endpoint, dhcp_repr)
@@ -349,6 +353,7 @@ impl Client {
                 let endpoint = IpEndpoint {
                     addr: Ipv4Address::BROADCAST.into(),
                     port: UDP_SERVER_PORT,
+                    hw_timestamp: None,
                 };
                 let requested_ip = match iface.ipv4_addr() {
                     Some(addr) if !addr.is_unspecified() =>
@@ -371,6 +376,7 @@ impl Client {
                 let endpoint = IpEndpoint {
                     addr: p_state.endpoint_ip.into(),
                     port: UDP_SERVER_PORT,
+                    hw_timestamp: None,
                 };
                 let client_ip = iface.ipv4_addr().unwrap_or(Ipv4Address::UNSPECIFIED);
                 dhcp_repr.message_type = DhcpMessageType::Request;
@@ -454,10 +460,12 @@ fn parse_udp<'a>(data: &'a [u8], checksum_caps: &ChecksumCapabilities) -> Result
     let src = IpEndpoint {
         addr: ipv4_repr.src_addr.into(),
         port: udp_repr.src_port,
+        hw_timestamp: None,
     };
     let dst = IpEndpoint {
         addr: ipv4_repr.dst_addr.into(),
         port: udp_repr.dst_port,
+        hw_timestamp: None,
     };
     let data = udp_repr.payload;
     Ok((src, dst, data))

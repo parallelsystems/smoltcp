@@ -60,10 +60,10 @@ struct StmPhyRxToken<'a>(&'a mut [u8]);
 
 impl<'a> phy::RxToken for StmPhyRxToken<'a> {
     fn consume<R, F>(mut self, _timestamp: Instant, f: F) -> Result<R>
-        where F: FnOnce(&mut [u8]) -> Result<R>
+        where F: FnOnce(&mut [u8], Option<u64>) -> Result<R>
     {
         // TODO: receive packet into buffer
-        let result = f(&mut self.0);
+        let result = f(&mut self.0, None);
         println!("rx called");
         result
     }
@@ -72,7 +72,7 @@ impl<'a> phy::RxToken for StmPhyRxToken<'a> {
 struct StmPhyTxToken<'a>(&'a mut [u8]);
 
 impl<'a> phy::TxToken for StmPhyTxToken<'a> {
-    fn consume<R, F>(self, _timestamp: Instant, len: usize, f: F) -> Result<R>
+    fn consume<R, F>(self, _timestamp: Instant, _hw_timestamp: bool, len: usize, f: F) -> Result<R>
         where F: FnOnce(&mut [u8]) -> Result<R>
     {
         let result = f(&mut self.0[..len]);
@@ -249,12 +249,13 @@ pub trait RxToken {
     /// Consumes the token to receive a single network packet.
     ///
     /// This method receives a packet and then calls the given closure `f` with the raw
-    /// packet bytes as argument.
+    /// packet bytes as argument. Optionally, a hardware timestamp is provided as a second argument.
     ///
     /// The timestamp must be a number of milliseconds, monotonically increasing since an
     /// arbitrary moment in time, such as system startup.
     fn consume<R, F>(self, timestamp: Instant, f: F) -> Result<R>
-        where F: FnOnce(&mut [u8]) -> Result<R>;
+    where
+        F: FnOnce(&mut [u8], Option<u64>) -> Result<R>;
 }
 
 /// A token to transmit a single network packet.
@@ -268,6 +269,6 @@ pub trait TxToken {
     ///
     /// The timestamp must be a number of milliseconds, monotonically increasing since an
     /// arbitrary moment in time, such as system startup.
-    fn consume<R, F>(self, timestamp: Instant, len: usize, f: F) -> Result<R>
+    fn consume<R, F>(self, timestamp: Instant, hw_timestamp: bool, len: usize, f: F) -> Result<R>
         where F: FnOnce(&mut [u8]) -> Result<R>;
 }

@@ -240,7 +240,8 @@ pub struct RxToken<'a, Rx: phy::RxToken> {
 
 impl<'a, Rx: phy::RxToken> phy::RxToken for RxToken<'a, Rx> {
     fn consume<R, F>(self, timestamp: Instant, f: F) -> Result<R>
-        where F: FnOnce(&mut [u8]) -> Result<R>
+    where
+        F: FnOnce(&mut [u8], Option<u64>) -> Result<R>,
     {
         if self.state.borrow_mut().maybe(self.config.drop_pct) {
             net_trace!("rx: randomly dropping a packet");
@@ -250,8 +251,8 @@ impl<'a, Rx: phy::RxToken> phy::RxToken for RxToken<'a, Rx> {
             net_trace!("rx: dropping a packet because of rate limiting");
             return Err(Error::Exhausted)
         }
-        let Self { token, config, state, mut corrupt } = self;
-        token.consume(timestamp, |buffer| {
+        let Self { token, config, state, mut corrupt, } = self;
+        token.consume(timestamp, |buffer, _timestamp| {
             if config.max_size > 0 && buffer.as_ref().len() > config.max_size {
                 net_trace!("rx: dropping a packet that is too large");
                 return Err(Error::Exhausted)
@@ -261,9 +262,9 @@ impl<'a, Rx: phy::RxToken> phy::RxToken for RxToken<'a, Rx> {
                 let mut corrupt = &mut corrupt[..buffer.len()];
                 corrupt.copy_from_slice(buffer);
                 state.borrow_mut().corrupt(&mut corrupt);
-                f(&mut corrupt)
+                f(&mut corrupt, None)
             } else {
-                f(buffer)
+                f(buffer, None)
             }
         })
     }
@@ -278,7 +279,7 @@ pub struct TxToken<'a, Tx: phy::TxToken> {
 }
 
 impl<'a, Tx: phy::TxToken> phy::TxToken for TxToken<'a, Tx> {
-    fn consume<R, F>(mut self, timestamp: Instant, len: usize, f: F) -> Result<R>
+    fn consume<R, F>(mut self, timestamp: Instant, hw_timestamp: bool, len: usize, f: F, ) -> Result<R>
         where F: FnOnce(&mut [u8]) -> Result<R>
     {
         let drop = if self.state.borrow_mut().maybe(self.config.drop_pct) {
@@ -299,7 +300,7 @@ impl<'a, Tx: phy::TxToken> phy::TxToken for TxToken<'a, Tx> {
         }
 
         let Self { token, state, config, .. } = self;
-        token.consume(timestamp, len, |mut buf| {
+        token.consume(timestamp, hw_timestamp, len, |mut buf| {
             if state.borrow_mut().maybe(config.corrupt_pct) {
                 net_trace!("tx: corrupting a packet");
                 state.borrow_mut().corrupt(&mut buf)

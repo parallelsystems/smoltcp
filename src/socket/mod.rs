@@ -140,6 +140,14 @@ impl<'a, 'b> Socket<'a, 'b> {
     pub(crate) fn poll_at(&self) -> PollAt {
         dispatch_socket!(self, |socket| socket.poll_at())
     }
+
+    pub(crate) fn hw_timestamp(&self) -> bool {
+        if let Socket::Udp(socket) = self {
+            socket.hw_timestamp
+        } else {
+            false
+        }
+    }
 }
 
 impl<'a, 'b> SocketSession for Socket<'a, 'b> {

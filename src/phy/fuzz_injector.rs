@@ -85,12 +85,12 @@ pub struct RxToken<'a, Rx: phy::RxToken, F: Fuzzer + 'a>{
 
 impl<'a, Rx: phy::RxToken, FRx: Fuzzer> phy::RxToken for RxToken<'a, Rx, FRx> {
     fn consume<R, F>(self, timestamp: Instant, f: F) -> Result<R>
-        where F: FnOnce(&mut [u8]) -> Result<R>
+        where F: FnOnce(&mut [u8], Option<u64>) -> Result<R>
     {
         let Self { fuzzer, token } = self;
-        token.consume(timestamp, |buffer| {
+        token.consume(timestamp, |buffer, _timestamp| {
             fuzzer.fuzz_packet(buffer);
-            f(buffer)
+            f(buffer, None)
         })
     }
 }
@@ -102,11 +102,11 @@ pub struct TxToken<'a, Tx: phy::TxToken, F: Fuzzer + 'a> {
 }
 
 impl<'a, Tx: phy::TxToken, FTx: Fuzzer> phy::TxToken for TxToken<'a, Tx, FTx> {
-    fn consume<R, F>(self, timestamp: Instant, len: usize, f: F) -> Result<R>
+    fn consume<R, F>(self, timestamp: Instant, hw_timestamp: bool, len: usize, f: F) -> Result<R>
         where F: FnOnce(&mut [u8]) -> Result<R>
     {
         let Self { fuzzer, token } = self;
-        token.consume(timestamp, len, |mut buf| {
+        token.consume(timestamp, hw_timestamp, len, |mut buf| {
             fuzzer.fuzz_packet(&mut buf);
             f(buf)
         })

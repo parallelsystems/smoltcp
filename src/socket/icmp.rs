@@ -430,7 +430,7 @@ mod test_ipv4 {
 
     const REMOTE_IPV4: Ipv4Address = Ipv4Address([0x7f, 0x00, 0x00, 0x02]);
     const LOCAL_IPV4:  Ipv4Address = Ipv4Address([0x7f, 0x00, 0x00, 0x01]);
-    const LOCAL_END_V4: IpEndpoint = IpEndpoint { addr: IpAddress::Ipv4(LOCAL_IPV4), port: LOCAL_PORT };
+    const LOCAL_END_V4: IpEndpoint = IpEndpoint { addr: IpAddress::Ipv4(LOCAL_IPV4), port: LOCAL_PORT, hw_timestamp: None };
 
     static ECHOV4_REPR: Icmpv4Repr = Icmpv4Repr::EchoRequest {
             ident:  0x1234,
@@ -630,7 +630,7 @@ mod test_ipv6 {
                                                   0, 0, 0, 0, 0, 0, 0, 1]);
     const LOCAL_IPV6:  Ipv6Address = Ipv6Address([0xfe, 0x80, 0, 0, 0, 0, 0, 0,
                                                   0, 0, 0, 0, 0, 0, 0, 2]);
-    const LOCAL_END_V6: IpEndpoint = IpEndpoint { addr: IpAddress::Ipv6(LOCAL_IPV6), port: LOCAL_PORT };
+    const LOCAL_END_V6: IpEndpoint = IpEndpoint { addr: IpAddress::Ipv6(LOCAL_IPV6), port: LOCAL_PORT, hw_timestamp: None };
     static ECHOV6_REPR: Icmpv6Repr = Icmpv6Repr::EchoRequest {
             ident:  0x1234,
             seq_no: 0x5678,

@@ -168,15 +168,15 @@ pub struct RxToken<Rx: phy::RxToken, S: PcapSink> {
 }
 
 impl<Rx: phy::RxToken, S: PcapSink> phy::RxToken for RxToken<Rx, S> {
-    fn consume<R, F: FnOnce(&mut [u8]) -> Result<R>>(self, timestamp: Instant, f: F) -> Result<R> {
+    fn consume<R, F: FnOnce(&mut [u8], Option<u64>) -> Result<R>>(self, timestamp: Instant, f: F) -> Result<R> {
         let Self { token, sink, mode } = self;
-        token.consume(timestamp, |buffer| {
+        token.consume(timestamp, |buffer, _timestamp| {
             match mode {
                 PcapMode::Both | PcapMode::RxOnly =>
                     sink.packet(timestamp, buffer.as_ref()),
                 PcapMode::TxOnly => ()
             }
-            f(buffer)
+            f(buffer, None)
         })
     }
 }
@@ -189,11 +189,11 @@ pub struct TxToken<Tx: phy::TxToken, S: PcapSink> {
 }
 
 impl<Tx: phy::TxToken, S: PcapSink> phy::TxToken for TxToken<Tx, S> {
-    fn consume<R, F>(self, timestamp: Instant, len: usize, f: F) -> Result<R>
+    fn consume<R, F>(self, timestamp: Instant, hw_timestamp: bool, len: usize, f: F) -> Result<R>
         where F: FnOnce(&mut [u8]) -> Result<R>
     {
         let Self { token, sink, mode } = self;
-        token.consume(timestamp, len, |buffer| {
+        token.consume(timestamp, hw_timestamp, len, |buffer| {
             let result = f(buffer);
             match mode {
                 PcapMode::Both | PcapMode::TxOnly =>

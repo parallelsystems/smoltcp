@@ -22,7 +22,8 @@ pub struct UdpSocket<'a, 'b: 'a> {
     rx_buffer: UdpSocketBuffer<'a, 'b>,
     tx_buffer: UdpSocketBuffer<'a, 'b>,
     /// The time-to-live (IPv4) or hop limit (IPv6) value used in outgoing packets.
-    hop_limit: Option<u8>
+    hop_limit: Option<u8>,
+    pub hw_timestamp: bool,
 }
 
 impl<'a, 'b> UdpSocket<'a, 'b> {
@@ -34,7 +35,8 @@ impl<'a, 'b> UdpSocket<'a, 'b> {
             endpoint:  IpEndpoint::default(),
             rx_buffer: rx_buffer,
             tx_buffer: tx_buffer,
-            hop_limit: None
+            hop_limit: None,
+            hw_timestamp: false,
         }
     }
 
@@ -223,12 +225,12 @@ impl<'a, 'b> UdpSocket<'a, 'b> {
         true
     }
 
-    pub(crate) fn process(&mut self, ip_repr: &IpRepr, repr: &UdpRepr) -> Result<()> {
+    pub(crate) fn process(&mut self, ip_repr: &IpRepr, repr: &UdpRepr, hw_timestamp: Option<u64>) -> Result<()> {
         debug_assert!(self.accepts(ip_repr, repr));
 
         let size = repr.payload.len();
 
-        let endpoint = IpEndpoint { addr: ip_repr.src_addr(), port: repr.src_port };
+        let endpoint = IpEndpoint { addr: ip_repr.src_addr(), port: repr.src_port, hw_timestamp };
         self.rx_buffer.enqueue(size, endpoint)?.copy_from_slice(repr.payload);
 
         net_trace!("{}:{}:{}: receiving {} octets",
@@ -302,8 +304,8 @@ mod test {
     const LOCAL_PORT:  u16        = 53;
     const REMOTE_PORT: u16        = 49500;
 
-    pub const LOCAL_END:   IpEndpoint = IpEndpoint { addr: MOCK_IP_ADDR_1, port: LOCAL_PORT  };
-    pub const REMOTE_END:  IpEndpoint = IpEndpoint { addr: MOCK_IP_ADDR_2, port: REMOTE_PORT };
+    pub const LOCAL_END: IpEndpoint = IpEndpoint { addr: MOCK_IP_ADDR_1, port: LOCAL_PORT, hw_timestamp: None };
+    pub const REMOTE_END: IpEndpoint = IpEndpoint { addr: MOCK_IP_ADDR_2, port: REMOTE_PORT, hw_timestamp: None };
 
     pub const LOCAL_IP_REPR: IpRepr = IpRepr::Unspecified {
         src_addr: MOCK_IP_ADDR_1,
@@ -418,13 +420,17 @@ mod test {
         assert_eq!(socket.recv(), Err(Error::Exhausted));
 
         assert!(socket.accepts(&remote_ip_repr(), &REMOTE_UDP_REPR));
-        assert_eq!(socket.process(&remote_ip_repr(), &REMOTE_UDP_REPR),
-                   Ok(()));
+        assert_eq!(
+            socket.process(&remote_ip_repr(), &REMOTE_UDP_REPR, None),
+            Ok(())
+        );
         assert!(socket.can_recv());
 
         assert!(socket.accepts(&remote_ip_repr(), &REMOTE_UDP_REPR));
-        assert_eq!(socket.process(&remote_ip_repr(), &REMOTE_UDP_REPR),
-                   Err(Error::Exhausted));
+        assert_eq!(
+            socket.process(&remote_ip_repr(), &REMOTE_UDP_REPR, None),
+            Err(Error::Exhausted)
+        );
         assert_eq!(socket.recv(), Ok((&b"abcdef"[..], REMOTE_END)));
         assert!(!socket.can_recv());
     }
@@ -436,7 +442,7 @@ mod test {
 
         assert_eq!(socket.peek(), Err(Error::Exhausted));
 
-        assert_eq!(socket.process(&remote_ip_repr(), &REMOTE_UDP_REPR),
+        assert_eq!(socket.process(&remote_ip_repr(), &REMOTE_UDP_REPR, None),
                    Ok(()));
         assert_eq!(socket.peek(), Ok((&b"abcdef"[..], &REMOTE_END)));
         assert_eq!(socket.recv(), Ok((&b"abcdef"[..], REMOTE_END)));
@@ -449,7 +455,7 @@ mod test {
         assert_eq!(socket.bind(LOCAL_PORT), Ok(()));
 
         assert!(socket.accepts(&remote_ip_repr(), &REMOTE_UDP_REPR));
-        assert_eq!(socket.process(&remote_ip_repr(), &REMOTE_UDP_REPR),
+        assert_eq!(socket.process(&remote_ip_repr(), &REMOTE_UDP_REPR, None),
                    Ok(()));
 
         let mut slice = [0; 4];
@@ -462,7 +468,7 @@ mod test {
         let mut socket = socket(buffer(1), buffer(0));
         assert_eq!(socket.bind(LOCAL_PORT), Ok(()));
 
-        assert_eq!(socket.process(&remote_ip_repr(), &REMOTE_UDP_REPR),
+        assert_eq!(socket.process(&remote_ip_repr(), &REMOTE_UDP_REPR, None),
                    Ok(()));
 
         let mut slice = [0; 4];
@@ -558,7 +564,7 @@ mod test {
             dst_port: LOCAL_PORT,
             payload: &[]
         };
-        assert_eq!(socket.process(&remote_ip_repr(), &repr), Ok(()));
+        assert_eq!(socket.process(&remote_ip_repr(), &repr, None), Ok(()));
         assert_eq!(socket.recv(), Ok((&[][..], REMOTE_END)));
     }
 }

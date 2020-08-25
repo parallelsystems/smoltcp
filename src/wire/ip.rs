@@ -399,16 +399,17 @@ impl fmt::Display for Cidr {
 #[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default)]
 pub struct Endpoint {
     pub addr: Address,
-    pub port: u16
+    pub port: u16,
+    pub hw_timestamp: Option<u64>,
 }
 
 impl Endpoint {
     /// An endpoint with unspecified address and port.
-    pub const UNSPECIFIED: Endpoint = Endpoint { addr: Address::Unspecified, port: 0 };
+    pub const UNSPECIFIED: Endpoint = Endpoint { addr: Address::Unspecified, port: 0, hw_timestamp: None };
 
     /// Create an endpoint address from given address and port.
     pub fn new(addr: Address, port: u16) -> Endpoint {
-        Endpoint { addr: addr, port: port }
+        Endpoint { addr: addr, port: port, hw_timestamp: None }
     }
 
     /// Query whether the endpoint has a specified address and port.
@@ -423,6 +424,7 @@ impl From<::std::net::SocketAddr> for Endpoint {
         Endpoint {
             addr: x.ip().into(),
             port: x.port(),
+            hw_timestamp: None,
         }
     }
 }
@@ -433,6 +435,7 @@ impl From<::std::net::SocketAddrV4> for Endpoint {
         Endpoint {
             addr: x.ip().clone().into(),
             port: x.port(),
+            hw_timestamp: None,
         }
     }
 }
@@ -443,6 +446,7 @@ impl From<::std::net::SocketAddrV6> for Endpoint {
         Endpoint {
             addr: x.ip().clone().into(),
             port: x.port(),
+            hw_timestamp: None,
         }
     }
 }
@@ -455,13 +459,13 @@ impl fmt::Display for Endpoint {
 
 impl From<u16> for Endpoint {
     fn from(port: u16) -> Endpoint {
-        Endpoint { addr: Address::Unspecified, port: port }
+        Endpoint { addr: Address::Unspecified, port: port, hw_timestamp: None }
     }
 }
 
 impl<T: Into<Address>> From<(T, u16)> for Endpoint {
     fn from((addr, port): (T, u16)) -> Endpoint {
-        Endpoint { addr: addr.into(), port: port }
+        Endpoint { addr: addr.into(), port: port, hw_timestamp: None }
     }
 }
 

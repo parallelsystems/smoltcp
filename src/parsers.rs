@@ -312,7 +312,11 @@ impl<'a> Parser<'a> {
             self.accept_number(5, 65535, false)?
         };
 
-        Ok(IpEndpoint { addr: IpAddress::Ipv4(ip), port: port as u16 })
+        Ok(IpEndpoint {
+            addr: IpAddress::Ipv4(ip),
+            port: port as u16,
+            hw_timestamp: None,
+        })
     }
 
     #[cfg(feature = "proto-ipv6")]
@@ -324,10 +328,10 @@ impl<'a> Parser<'a> {
             self.accept_char(b':')?;
             let port = self.accept_number(5, 65535, false)?;
 
-            Ok(IpEndpoint { addr: IpAddress::Ipv6(ip), port: port as u16 })
+            Ok(IpEndpoint { addr: IpAddress::Ipv6(ip), port: port as u16, hw_timestamp: None })
         } else {
             let ip = self.accept_ipv6(false)?;
-            Ok(IpEndpoint { addr: IpAddress::Ipv6(ip), port: 0 })
+            Ok(IpEndpoint { addr: IpAddress::Ipv6(ip), port: 0, hw_timestamp: None })
         }
     }
 
@@ -643,11 +647,11 @@ mod test {
         assert_eq!(IpEndpoint::from_str("x"), Err(()));
         assert_eq!(
             IpEndpoint::from_str("127.0.0.1"),
-            Ok(IpEndpoint { addr: IpAddress::v4(127, 0, 0, 1), port: 0 })
+            Ok(IpEndpoint { addr: IpAddress::v4(127, 0, 0, 1), port: 0, hw_timestamp: None })
         );
         assert_eq!(
             IpEndpoint::from_str("127.0.0.1:12345"),
-            Ok(IpEndpoint { addr: IpAddress::v4(127, 0, 0, 1), port: 12345 })
+            Ok(IpEndpoint { addr: IpAddress::v4(127, 0, 0, 1), port: 12345, hw_timestamp: None })
         );
     }
 
@@ -658,11 +662,11 @@ mod test {
         assert_eq!(IpEndpoint::from_str("x"), Err(()));
         assert_eq!(
             IpEndpoint::from_str("fe80::1"),
-            Ok(IpEndpoint { addr: IpAddress::v6(0xfe80, 0, 0, 0, 0, 0, 0, 1), port: 0 })
+            Ok(IpEndpoint { addr: IpAddress::v6(0xfe80, 0, 0, 0, 0, 0, 0, 1), port: 0, hw_timestamp: None })
         );
         assert_eq!(
             IpEndpoint::from_str("[fe80::1]:12345"),
-            Ok(IpEndpoint { addr: IpAddress::v6(0xfe80, 0, 0, 0, 0, 0, 0, 1), port: 12345 })
+            Ok(IpEndpoint { addr: IpAddress::v6(0xfe80, 0, 0, 0, 0, 0, 0, 1), port: 12345, hw_timestamp: None })
         );
     }
 }
