@@ -10,11 +10,11 @@ use crate::{Error, Result};
 
 use super::PollAt;
 
-const DISCOVER_TIMEOUT: Duration = Duration::from_secs(10);
+const DISCOVER_TIMEOUT: Duration = Duration::from_millis(30);
 
 // timeout doubles every 2 tries.
 // total time 5 + 5 + 10 + 10 + 20 = 50s
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
+const REQUEST_TIMEOUT: Duration = Duration::from_millis(10);
 const REQUEST_RETRIES: u16 = 5;
 
 const MIN_RENEW_TIMEOUT: Duration = Duration::from_secs(60);
